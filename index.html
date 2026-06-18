@@ -20,7 +20,7 @@
     <div class="mb-3">
       <label class="fw-bold">SKU Hasil Scan</label>
       <div class="input-group">
-        <input type="text" class="form-control" id="sku" placeholder="Scan atau ketik..." required>
+        <input type="text" class="form-control" id="sku" placeholder="Scan atau ketik..." onchange="ambilNamaOtomatis()" onkeyup="debouncedAmbilNama()" required>
         <button class="btn btn-dark" type="button" onclick="startScanner()">📷 Scan</button>
       </div>
     </div>
@@ -38,15 +38,26 @@
 </div>
 
 <script>
-  // GANTI LINK DI BAWAH DENGAN URL EXEC BARU ANDA
-  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxd_ZvunOEDhawoPlgMKkyd0VAlSJjwZtP9NxpIo3CAryYUn4h0MN0qg9My1nOJpFlfvg/exec"; 
+  // ⚠️ TEMPELKAN LINK WEB APP KAMU DI BAWAH INI
+  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxsWGuaIwcJJLRy5hlG0VvqGSunnT_vBiDm4Y0RfgAxn4lejCG9-NIImMB8Go17suDkdQ/exec"; 
+
+  let timeoutKetik = null;
+
+  // Fitur jeda ketik agar tidak menembak server terus-menerus saat mengetik manual
+  function debouncedAmbilNama() {
+    clearTimeout(timeoutKetik);
+    timeoutKetik = setTimeout(ambilNamaOtomatis, 800); 
+  }
 
   function ambilNamaOtomatis() {
-    const sku = document.getElementById('sku').value;
+    const sku = document.getElementById('sku').value.trim();
+    if (!sku) return;
+    
     document.getElementById('nama').value = "Mencari...";
     fetch(`${WEB_APP_URL}?action=cari&sku=${encodeURIComponent(sku)}`)
       .then(r => r.text())
-      .then(t => { document.getElementById('nama').value = t; });
+      .then(t => { document.getElementById('nama').value = t; })
+      .catch(e => { document.getElementById('nama').value = "Gagal memuat nama"; });
   }
 
   function startScanner() {
@@ -54,7 +65,7 @@
     const scanner = new Html5Qrcode("reader");
     scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, 
       (txt) => {
-        document.getElementById('sku').value = txt.trim(); // SKU UTUH
+        document.getElementById('sku').value = txt.trim(); 
         scanner.stop();
         document.getElementById('reader').style.display = 'none';
         ambilNamaOtomatis();
@@ -64,17 +75,41 @@
 
   function handleFormSubmit(e) {
     e.preventDefault();
-    document.getElementById('submitBtn').disabled = true;
-    const params = new URLSearchParams({
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.innerText = "Menyimpan...";
+
+    const payload = {
       sku: document.getElementById('sku').value,
       nama: document.getElementById('nama').value,
       p: document.getElementById('p').value,
       l: document.getElementById('l').value,
       t: document.getElementById('t').value
+    };
+
+    // Menggunakan trik bypass CORS khusus GitHub Pages ke Google Apps Script
+    fetch(WEB_APP_URL, { 
+      method: 'POST', 
+      mode: 'no-cors', 
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload) 
+    })
+    .then(() => {
+      alert("Data dimensi berhasil dikirim ke Google Sheets!");
+      // Mengosongkan form angka agar siap menginput barang berikutnya
+      document.getElementById('sku').value = "";
+      document.getElementById('nama').value = "";
+      document.getElementById('p').value = "";
+      document.getElementById('l').value = "";
+      document.getElementById('t').value = "";
+      btn.disabled = false;
+      btn.innerText = "Simpan Ke Sheet";
+    })
+    .catch(err => {
+      alert("Terjadi masalah saat mengirim data: " + err);
+      btn.disabled = false;
+      btn.innerText = "Simpan Ke Sheet";
     });
-    fetch(WEB_APP_URL, { method: 'POST', body: params })
-      .then(r => r.text())
-      .then(m => { alert(m); location.reload(); });
   }
 </script>
 </body>
