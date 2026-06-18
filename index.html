@@ -38,26 +38,40 @@
 </div>
 
 <script>
-  // ⚠️ TEMPELKAN LINK WEB APP KAMU DI BAWAH INI
+  // Link Web App Apps Script Anda yang aktif
   const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxsWGuaIwcJJLRy5hlG0VvqGSunnT_vBiDm4Y0RfgAxn4lejCG9-NIImMB8Go17suDkdQ/exec"; 
 
   let timeoutKetik = null;
 
-  // Fitur jeda ketik agar tidak menembak server terus-menerus saat mengetik manual
   function debouncedAmbilNama() {
     clearTimeout(timeoutKetik);
     timeoutKetik = setTimeout(ambilNamaOtomatis, 800); 
   }
 
+  // JALUR BYPASS CORS MENGGUNAKAN METODE JSONP (SCRIPT INJECTION)
   function ambilNamaOtomatis() {
     const sku = document.getElementById('sku').value.trim();
     if (!sku) return;
     
     document.getElementById('nama').value = "Mencari...";
-    fetch(`${WEB_APP_URL}?action=cari&sku=${encodeURIComponent(sku)}`)
-      .then(r => r.text())
-      .then(t => { document.getElementById('nama').value = t; })
-      .catch(e => { document.getElementById('nama').value = "Gagal memuat nama"; });
+
+    // Hapus script pemicu request JSONP lama jika masih menempel di halaman
+    const scriptId = 'jsonp_sku_request';
+    const scriptLama = document.getElementById(scriptId);
+    if (scriptLama) scriptLama.remove();
+
+    // Buat tag <script> baru untuk memanggil API secara aman bypass CORS
+    const script = document.createElement('script');
+    script.id = scriptId;
+    script.src = `${WEB_APP_URL}?action=cari&sku=${encodeURIComponent(sku)}&callback=tampilkanNamaKeForm`;
+    
+    // Masukkan ke body dokumen agar tereksekusi oleh browser
+    document.body.appendChild(script);
+  }
+
+  // Fungsi penangkap data sukses yang dikirim balik oleh Google Apps Script
+  function tampilkanNamaKeForm(namaProduk) {
+    document.getElementById('nama').value = namaProduk;
   }
 
   function startScanner() {
@@ -87,7 +101,6 @@
       t: document.getElementById('t').value
     };
 
-    // Menggunakan trik bypass CORS khusus GitHub Pages ke Google Apps Script
     fetch(WEB_APP_URL, { 
       method: 'POST', 
       mode: 'no-cors', 
@@ -96,7 +109,6 @@
     })
     .then(() => {
       alert("Data dimensi berhasil dikirim ke Google Sheets!");
-      // Mengosongkan form angka agar siap menginput barang berikutnya
       document.getElementById('sku').value = "";
       document.getElementById('nama').value = "";
       document.getElementById('p').value = "";
